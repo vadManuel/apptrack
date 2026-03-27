@@ -22,8 +22,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--apps",
-        default="applications.yaml",
-        help="path to applications YAML (default: applications.yaml)",
+        help="path to applications YAML",
     )
     args = parser.parse_args()
 
