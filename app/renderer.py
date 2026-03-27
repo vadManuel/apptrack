@@ -16,7 +16,7 @@ DIM = "" if NO_COLOR else "\033[2m"
 ITALIC = "" if NO_COLOR else "\033[3m"
 
 # Layout constants
-SUFFIX_WIDTH = 25  # space reserved for "Stage / Days" column
+SUFFIX_WIDTH = 30  # space reserved for "  Stage (Xd)" suffix column
 MIN_LABEL_WIDTH = 30
 MAX_LABEL_WIDTH = 70
 LABEL_WIDTH_RATIO = 2 / 5  # fraction of remaining width for labels
@@ -180,7 +180,11 @@ def render(
             total_elapsed = (app.segments[-1].end - app.segments[0].start).days
             max_len = label_width - ellipsis_width
             truncated = app.position[:max_len].ljust(label_width - 2)
-            print(f"  {truncated}{bar_str}  {app.last_stage} ({total_elapsed}d)")
+            suffix = f"{app.last_stage} ({total_elapsed}d)"
+            max_suffix = SUFFIX_WIDTH - 2  # account for "  " separator
+            if len(suffix) > max_suffix:
+                suffix = suffix[: max_suffix - 1] + "…"
+            print(f"  {truncated}{bar_str}  {suffix}")
             if app.note:
                 print(f"  {ITALIC}{DIM}  └─ {app.note}{RESET}")
 
