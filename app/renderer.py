@@ -1,17 +1,30 @@
-from datetime import date, datetime
+import os
+from collections.abc import Callable
+from datetime import date
 
-from app.transformer import DataTransformer
+from app.models import Application, Segment, StageStat
+from app.transform import group_by_company
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
 DIM = "\033[2m"
 ITALIC = "\033[3m"
 
-BAR_WIDTH = 90
-LABEL_WIDTH = 70
+SUFFIX_WIDTH = 25
 
 
-def hex_to_ansi_bg(hex_color):
+def _get_dimensions() -> tuple[int, int]:
+    try:
+        columns = os.get_terminal_size().columns
+    except OSError:
+        columns = 180
+    remaining = columns - SUFFIX_WIDTH
+    label_width = min(70, max(30, remaining * 2 // 5))
+    bar_width = remaining - label_width
+    return label_width, bar_width
+
+
+def hex_to_ansi_bg(hex_color: str) -> str:
     r = int(hex_color[1:3], 16)
     g = int(hex_color[3:5], 16)
     b = int(hex_color[5:7], 16)
@@ -20,199 +33,127 @@ def hex_to_ansi_bg(hex_color):
     return f"\033[48;2;{r};{g};{b}m{fg}"
 
 
-def build_timeline_data(transformer: DataTransformer):
-    today = date.today()
-    apps_data = []
+def _format_summary(stats: list[StageStat], total: int) -> str:
+    lines = [
+        "",
+        f"{BOLD}Summary:{RESET}  ({total} total applications)",
+        "─" * 60,
+        f"{'Stage':<24} {'Count':>5}  {'%':>6}  {'Avg Days':>8}",
+        "─" * 60,
+    ]
 
-    for company, applications in transformer.apps.items():
-        for app in applications:
-            attrs = app.get("attrs", {})
-            position = app["position"]
-
-            stages = []
-            for key in transformer.flow_order:
-                if key in attrs:
-                    dt = datetime.strptime(attrs[key], "%m/%d/%Y").date()
-                    stages.append((key, dt))
-
-            terminal = None
-            for t in transformer.terminal_states:
-                if t in attrs:
-                    dt = datetime.strptime(attrs[t], "%m/%d/%Y").date()
-                    terminal = (t, dt)
-                    break
-
-            if not stages:
-                continue
-
-            segments = []
-            for i, (key, start) in enumerate(stages):
-                stage_name = transformer.stage_map[key]
-                if i + 1 < len(stages):
-                    end = stages[i + 1][1]
-                elif terminal:
-                    end = terminal[1]
-                else:
-                    end = today
-                segments.append((stage_name, start, end))
-
-            if terminal:
-                t_key, t_date = terminal
-                stage_name = transformer.stage_map[t_key]
-                segments.append((stage_name, t_date, t_date))
-
-            submit_date = stages[0][1]
-            last_stage = segments[-1][0]
-            note = app.get("note")
-            apps_data.append(
-                (company, position, submit_date, segments, last_stage, note)
-            )
-
-    return apps_data
-
-
-def render(transformer: DataTransformer):
-    today = date.today()
-    apps_data = build_timeline_data(transformer)
-
-    # Determine date range
-    all_dates = [today]
-    for _, _, _, segments, _, _ in apps_data:
-        for _, start, end in segments:
-            all_dates.extend([start, end])
-    min_date = min(all_dates)
-    max_date = max(all_dates)
-    total_days = (max_date - min_date).days or 1
-
-    def date_to_col(d):
-        return round((d - min_date).days / total_days * BAR_WIDTH)
-
-    # Summary
-    total_apps = len(apps_data)
-    stage_counts = {}
-    stage_days = {}
-
-    for _, _, _, segments, last_stage, _ in apps_data:
-        stage_counts[last_stage] = stage_counts.get(last_stage, 0) + 1
-        last_seg = segments[-1]
-        days_in_stage = (last_seg[2] - last_seg[1]).days
-        stage_days.setdefault(last_stage, []).append(days_in_stage)
-
-    print()
-    print(f"{BOLD}Summary:{RESET}  ({total_apps} total applications)")
-    print("─" * 60)
-    print(f"{'Stage':<24} {'Count':>5}  {'%':>6}  {'Avg Days':>8}")
-    print("─" * 60)
-
-    all_keys = transformer.flow_order + transformer.terminal_states
-    for key in all_keys:
-        name = transformer.stage_map[key]
-        count = stage_counts.get(name, 0)
-        pct = count / total_apps * 100 if count else 0
-        avg_days = sum(stage_days[name]) / count if count else 0
-        color = transformer.colors[name]
-        ansi = hex_to_ansi_bg(color)
-        label = f"{ansi} {key} {RESET} {name}"
-        # pad accounting for ANSI escape codes (not visible width)
-        visible_len = len(f" {key}  {name}")
+    for stat in stats:
+        ansi = hex_to_ansi_bg(stat.color)
+        label = f"{ansi} {stat.key} {RESET} {stat.label}"
+        visible_len = len(f" {stat.key}  {stat.label}")
         padding = 24 - visible_len
-        print(f"{label}{' ' * padding} {count:>5}  {pct:>5.1f}%  {avg_days:>7.1f}d")
+        lines.append(
+            f"{label}{' ' * padding} "
+            f"{stat.count:>5}  {stat.percentage:>5.1f}%  {stat.avg_days:>7.1f}d"
+        )
 
-    # Header
-    print()
-    print(
-        f"{BOLD}{'Application':<{LABEL_WIDTH}} "
-        f"{'Timeline':<{BAR_WIDTH}}  Stage / Days{RESET}"
-    )
-    print("─" * (LABEL_WIDTH + BAR_WIDTH + 20))
+    return "\n".join(lines)
 
-    # Month markers
-    month_chars = list(" " * BAR_WIDTH)
+
+def _build_month_markers(
+    min_date: date,
+    max_date: date,
+    date_to_col: Callable[[date], int],
+    bar_width: int,
+    label_width: int,
+) -> str:
+    month_chars = list(" " * bar_width)
     d = min_date.replace(day=1)
     while d <= max_date:
         col = date_to_col(d)
         month_label = d.strftime("%b")
-        if 0 <= col <= BAR_WIDTH - len(month_label):
+        if 0 <= col <= bar_width - len(month_label):
             for j, ch in enumerate(month_label):
                 month_chars[col + j] = ch
         if d.month == 12:
             d = d.replace(year=d.year + 1, month=1)
         else:
             d = d.replace(month=d.month + 1)
-    print(f"{DIM}{' ' * LABEL_WIDTH}{''.join(month_chars)}{RESET}")
+    return f"{DIM}{' ' * label_width}{''.join(month_chars)}{RESET}"
 
-    # Sort: furthest in interview process first, quickest rejections last
-    flow_stage_names = [transformer.stage_map[k] for k in transformer.flow_order]
-    terminal_stage_names = [
-        transformer.stage_map[k] for k in transformer.terminal_states
-    ]
 
-    def sort_key(app):
-        company, position, submit_date, segments, last_stage, note = app
-        is_terminal = last_stage in terminal_stage_names
-        if not is_terminal:
-            # Active: furthest stage (desc), then most recent
-            stage_idx = (
-                flow_stage_names.index(last_stage)
-                if last_stage in flow_stage_names
-                else -1
-            )
-            return (0, -stage_idx, -segments[-1][2].toordinal())
+def _format_bar(
+    segments: list[Segment],
+    color_map: dict[str, str],
+    date_to_col: Callable[[date], int],
+    bar_width: int,
+) -> str:
+    bar = [" "] * bar_width
+
+    for seg in segments:
+        c1 = date_to_col(seg.start)
+        c2 = date_to_col(seg.end)
+        if c2 <= c1:
+            c2 = c1 + 1
+        if c1 >= bar_width:
+            c1 = bar_width - 1
+        if c2 > bar_width:
+            c2 = bar_width
+        color = color_map.get(seg.stage_label, "#888888")
+        ansi = hex_to_ansi_bg(color)
+        for c in range(c1, c2):
+            bar[c] = f"{ansi} {RESET}"
+
+    parts = []
+    for cell in bar:
+        if cell == " ":
+            parts.append(f"{DIM}·{RESET}")
         else:
-            # Terminal: furthest stage before terminal (desc)
-            # then by how quickly they were rejected (quickest rejection = last)
-            non_terminal = [s for s in segments if s[0] not in terminal_stage_names]
-            max_flow = max(
-                (
-                    flow_stage_names.index(s[0])
-                    for s in non_terminal
-                    if s[0] in flow_stage_names
-                ),
-                default=-1,
-            )
-            total_elapsed = (segments[-1][2] - segments[0][1]).days
-            return (1, -max_flow, -total_elapsed, submit_date.toordinal())
+            parts.append(cell)
+    return "".join(parts)
 
-    apps_data.sort(key=sort_key)
 
-    # Group by company, preserving sorted order
-    from collections import OrderedDict
+def render(
+    apps: list[Application],
+    stats: list[StageStat],
+    colors: dict[str, str],
+) -> None:
+    label_width, bar_width = _get_dimensions()
+    today = date.today()
 
-    grouped = OrderedDict()
-    for company, position, _submit_date, segments, last_stage, note in apps_data:
-        grouped.setdefault(company, []).append((position, segments, last_stage, note))
+    # Summary
+    print(_format_summary(stats, len(apps)))
+
+    if not apps:
+        print(f"\n{DIM}No applications to display.{RESET}\n")
+        return
+
+    # Date range
+    all_dates = [today]
+    for app in apps:
+        for seg in app.segments:
+            all_dates.extend([seg.start, seg.end])
+    min_date = min(all_dates)
+    max_date = max(all_dates)
+    total_days = (max_date - min_date).days or 1
+
+    def date_to_col(d: date) -> int:
+        return round((d - min_date).days / total_days * bar_width)
+
+    # Header
+    print()
+    print(
+        f"{BOLD}{'Application':<{label_width}} "
+        f"{'Timeline':<{bar_width}}  Stage / Days{RESET}"
+    )
+    print("─" * (label_width + bar_width + 20))
+    print(_build_month_markers(min_date, max_date, date_to_col, bar_width, label_width))
 
     # Application rows
+    grouped = group_by_company(apps)
     for company, roles in grouped.items():
         print(f"{BOLD}{company} ({len(roles)}){RESET}")
-        for position, segments, last_stage, note in roles:
-            bar = [" "] * BAR_WIDTH
-
-            for stage_name, start, end in segments:
-                c1 = date_to_col(start)
-                c2 = date_to_col(end)
-                if c2 <= c1:
-                    c2 = c1 + 1
-                if c1 >= BAR_WIDTH:
-                    c1 = BAR_WIDTH - 1
-                if c2 > BAR_WIDTH:
-                    c2 = BAR_WIDTH
-                color = transformer.colors.get(stage_name, "#888888")
-                ansi = hex_to_ansi_bg(color)
-                for c in range(c1, c2):
-                    bar[c] = f"{ansi} {RESET}"
-
-            bar_str = ""
-            for cell in bar:
-                if cell == " ":
-                    bar_str += f"{DIM}·{RESET}"
-                else:
-                    bar_str += cell
-
-            total_elapsed = (segments[-1][2] - segments[0][1]).days
-            truncated = position[: LABEL_WIDTH - 3].ljust(LABEL_WIDTH - 2)
-            print(f"  {truncated}{bar_str}  {last_stage} ({total_elapsed}d)")
-            if note:
-                print(f"  {ITALIC}{DIM}  \u2514\u2500 {note}{RESET}")
+        for app in roles:
+            bar_str = _format_bar(app.segments, colors, date_to_col, bar_width)
+            total_elapsed = (app.segments[-1].end - app.segments[0].start).days
+            truncated = app.position[: label_width - 3].ljust(label_width - 2)
+            print(f"  {truncated}{bar_str}  {app.last_stage} ({total_elapsed}d)")
+            if app.note:
+                print(f"  {ITALIC}{DIM}  └─ {app.note}{RESET}")
 
     print()

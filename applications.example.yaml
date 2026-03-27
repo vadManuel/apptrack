@@ -1,0 +1,30 @@
+# List of job applications to track.
+# Each entry is a company with one or more roles.
+applications:
+  - company: Stark Industries
+    roles:
+      - position: Senior Repulsor Engineer
+        # Stage keys map to dates (M/D/YYYY). See flow.yaml for all keys:
+        #   Flow:     S=Submitted, C=Recruiter Scheduled, A=Assessment,
+        #             L=Interview Loop, W=Awaiting Feedback, R=Received Offer
+        #   Terminal: F=Withdrawn, X=Denied, U=Filtered Out
+        stages:
+          S: 1/15/2026
+          C: 1/22/2026
+          A: 2/3/2026
+          L: 2/10/2026
+          X: 2/18/2026
+        note: Pepper said the team culture is great # optional free-text note
+
+      - position: Arc Reactor Technician
+        stages:
+          S: 2/1/2026
+          C: 2/8/2026
+        note: Waiting on recruiter
+
+  - company: Acme Corporation
+    roles:
+      - position: Anvil QA Specialist
+        stages:
+          S: 1/20/2026
+          U: 1/21/2026

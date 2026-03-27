@@ -1,3 +1,11 @@
 .DS_Store
 __pycache__
+*.pyc
 .python-version
+.venv/
+.ruff_cache
+.mypy_cache
+dist/
+build/
+*.egg-info/
+applications.yaml
