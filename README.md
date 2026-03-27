@@ -1,84 +1,54 @@
-# Applications
+# apptrack
 
-A CLI tool that visualizes job application timelines in the terminal. Reads application data from `flow.yaml` and `applications.yaml` and renders a color-coded Gantt-style chart showing the progression of each application through its stages.
+**Your job hunt, visualized.** A terminal-native Gantt chart that turns your job application chaos into a clean, color-coded timeline.
 
-## Prerequisites
+![apptrack screenshot](assets/screenshot.png)
 
-- Python 3.13+
-- [uv](https://docs.astral.sh/uv/)
+## Why?
 
-## Setup
+Spreadsheets are boring. Notion boards are overkill. You just want to glance at your terminal and know where every application stands — from "Submitted" to "Offer" (or the inevitable "Denied"). `apptrack` renders your entire pipeline as a Gantt chart, right where you already live: the command line.
+
+## Quickstart
+
+**Prerequisites:** Python 3.13+ and [uv](https://docs.astral.sh/uv/)
 
 ```sh
+# Clone & install
 make setup
 uv sync
-```
 
-## Run
-
-```sh
+# Run with example data
 uv run apptrack --apps applications.example.yaml
 ```
 
-### CLI Options
-
-| Flag     | Default              | Description                      |
-| -------- | -------------------- | -------------------------------- |
-| `--flow` | `flow.yaml`          | Path to flow config YAML         |
-| `--apps` | -                    | Path to applications YAML        |
+## Usage
 
 ```sh
-uv run apptrack --flow custom-flow.yaml --apps my-apps.yaml
+uv run apptrack --apps applications.yaml
 ```
 
-Set `NO_COLOR=1` to disable ANSI color output:
+| Flag     | Default     | Description               |
+| -------- | ----------- | ------------------------- |
+| `--flow` | `flow.yaml` | Path to flow config YAML  |
+| `--apps` | —           | Path to applications YAML |
 
-```sh
-NO_COLOR=1 uv run apptrack
-```
+## Setting up your data
+
+Create an `applications.yaml` in the project root — see [`applications.example.yaml`](applications.example.yaml) for the format. JSON schemas in `schemas/` provide IDE autocompletion.
+
+Stages are defined in [`flow.yaml`](flow.yaml):
+
+| Flow stages               |                             | Terminal stages        |                      |
+| ------------------------- | --------------------------- | ---------------------- | -------------------- |
+| **S** — Submitted         | **C** — Recruiter Scheduled | **R** — Received Offer | **U** — Filtered Out |
+| **A** — Assessment        | **L** — Interview Loop      | **F** — Withdrawn      | **X** — Denied       |
+| **W** — Awaiting Feedback |                             |                        |                      |
 
 ## Development
 
-### Lint, Format & Type Check
-
 ```sh
-uv run ruff format app/ main.py tests/  # format code
+uv run ruff format app/ main.py tests/  # format
 uv run ruff check app/ main.py tests/   # lint
-uv run ruff check --fix app/ main.py    # auto-fix lint issues
 uv run pyright app/ main.py             # type check
+uv run pytest                           # test
 ```
-
-### Test
-
-```sh
-uv run pytest
-```
-
-## Data
-
-Stage definitions are stored in `flow.yaml` (committed). Application data is stored in `applications.yaml` (not committed — personal data).
-
-### Setting up `applications.yaml`
-
-Create an `applications.yaml` file in the project root. See [`applications.example.yaml`](applications.example.yaml) for the expected format. JSON schemas for both files are in the `schemas/` directory for IDE autocompletion.
-
-Stage keys are defined in `flow.yaml`:
-
-#### Flow stages (in order)
-
-| Key | Label               |
-| --- | ------------------- |
-| S   | Submitted           |
-| C   | Recruiter Scheduled |
-| A   | Assessment          |
-| L   | Interview Loop      |
-| W   | Awaiting Feedback   |
-| R   | Received Offer      |
-
-#### Terminal stages
-
-| Key | Label        |
-| --- | ------------ |
-| F   | Withdrawn    |
-| X   | Denied       |
-| U   | Filtered Out |
