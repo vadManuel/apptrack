@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.models import Application, FlowConfig, RawRole, Segment
+from app.models import Application, RawRole, Segment
 from app.transform import (
     build_timeline_data,
     compute_summary,
@@ -8,31 +8,10 @@ from app.transform import (
     sort_applications,
 )
 
-
-def _make_config() -> FlowConfig:
-    return FlowConfig(
-        stage_map={
-            "S": "Submitted",
-            "R": "Recruiter",
-            "A": "Assessment",
-            "X": "Denied",
-        },
-        colors={
-            "Submitted": "#8294a8",
-            "Recruiter": "#5b9bd5",
-            "Assessment": "#70ad47",
-            "Denied": "#787878",
-        },
-        flow_order=["S", "R", "A"],
-        terminal_states=["X"],
-    )
-
-
 # --- build_timeline_data ---
 
 
-def test_build_timeline_basic():
-    config = _make_config()
+def test_build_timeline_basic(config):
     raw_apps = {
         "Acme": [
             RawRole("Engineer", {"S": "1/10/2026", "R": "1/20/2026", "X": "2/1/2026"}),
@@ -55,9 +34,8 @@ def test_build_timeline_basic():
     assert app.segments[2].stage_label == "Denied"
 
 
-def test_build_timeline_active_app():
+def test_build_timeline_active_app(config):
     """App with no terminal state uses today as end date."""
-    config = _make_config()
     raw_apps = {
         "Beta": [RawRole("Designer", {"S": "2/1/2026"})],
     }
@@ -69,9 +47,8 @@ def test_build_timeline_active_app():
     assert apps[0].last_stage == "Submitted"
 
 
-def test_build_timeline_skips_empty_stages():
+def test_build_timeline_skips_empty_stages(config):
     """A role with no matching flow stages is skipped."""
-    config = _make_config()
     raw_apps = {
         "Ghost": [RawRole("PM", {"Z": "1/1/2026"})],
     }
@@ -79,11 +56,21 @@ def test_build_timeline_skips_empty_stages():
     assert apps == []
 
 
+def test_build_timeline_multiple_companies(config):
+    """Multiple companies produce multiple applications."""
+    raw_apps = {
+        "Acme": [RawRole("Eng", {"S": "1/1/2026"})],
+        "Beta": [RawRole("PM", {"S": "2/1/2026"})],
+    }
+    apps = build_timeline_data(raw_apps, config, today=date(2026, 3, 1))
+    assert len(apps) == 2
+    assert {a.company for a in apps} == {"Acme", "Beta"}
+
+
 # --- compute_summary ---
 
 
-def test_compute_summary_basic():
-    config = _make_config()
+def test_compute_summary_basic(config):
     apps = [
         Application(
             company="Acme",
@@ -109,9 +96,8 @@ def test_compute_summary_basic():
     assert submitted.avg_days == 0.0
 
 
-def test_compute_summary_stage_with_zero_apps():
+def test_compute_summary_stage_with_zero_apps(config):
     """Stages with zero applications should not KeyError."""
-    config = _make_config()
     stats = compute_summary([], config)
 
     for stat in stats:
@@ -123,8 +109,7 @@ def test_compute_summary_stage_with_zero_apps():
 # --- sort_applications ---
 
 
-def test_sort_active_before_terminal():
-    config = _make_config()
+def test_sort_active_before_terminal(config):
     active = Application(
         company="A",
         position="Eng",
@@ -147,8 +132,7 @@ def test_sort_active_before_terminal():
     assert result[1].last_stage == "Denied"
 
 
-def test_sort_later_stage_first():
-    config = _make_config()
+def test_sort_later_stage_first(config):
     early = Application(
         company="A",
         position="Eng",

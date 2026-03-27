@@ -1,3 +1,5 @@
+"""ANSI terminal rendering for the Gantt-style timeline."""
+
 import os
 from collections.abc import Callable
 from datetime import date
@@ -5,35 +7,56 @@ from datetime import date
 from app.models import Application, Segment, StageStat
 from app.transform import group_by_company
 
-RESET = "\033[0m"
-BOLD = "\033[1m"
-DIM = "\033[2m"
-ITALIC = "\033[3m"
+# Respect the NO_COLOR convention (https://no-color.org/)
+NO_COLOR = "NO_COLOR" in os.environ
 
-SUFFIX_WIDTH = 25
+RESET = "" if NO_COLOR else "\033[0m"
+BOLD = "" if NO_COLOR else "\033[1m"
+DIM = "" if NO_COLOR else "\033[2m"
+ITALIC = "" if NO_COLOR else "\033[3m"
+
+# Layout constants
+SUFFIX_WIDTH = 25  # space reserved for "Stage / Days" column
+MIN_LABEL_WIDTH = 30
+MAX_LABEL_WIDTH = 70
+LABEL_WIDTH_RATIO = 2 / 5  # fraction of remaining width for labels
+FALLBACK_COLUMNS = 180  # used when terminal size can't be detected
+LUMINANCE_THRESHOLD = 128  # above this → dark text, below → light text
+FALLBACK_STAGE_COLOR = "#888888"
 
 
 def _get_dimensions() -> tuple[int, int]:
+    """Compute label and bar widths from the current terminal size."""
     try:
         columns = os.get_terminal_size().columns
     except OSError:
-        columns = 180
+        columns = FALLBACK_COLUMNS
     remaining = columns - SUFFIX_WIDTH
-    label_width = min(70, max(30, remaining * 2 // 5))
+    raw = int(remaining * LABEL_WIDTH_RATIO)
+    label_width = min(MAX_LABEL_WIDTH, max(MIN_LABEL_WIDTH, raw))
     bar_width = remaining - label_width
     return label_width, bar_width
 
 
 def hex_to_ansi_bg(hex_color: str) -> str:
+    """Convert a hex color to an ANSI background escape sequence.
+
+    Automatically picks a black or white foreground based on the
+    perceived luminance of the background (ITU-R BT.601 formula).
+    Returns an empty string when NO_COLOR is set.
+    """
+    if NO_COLOR:
+        return ""
     r = int(hex_color[1:3], 16)
     g = int(hex_color[3:5], 16)
     b = int(hex_color[5:7], 16)
     lum = 0.299 * r + 0.587 * g + 0.114 * b
-    fg = "\033[30m" if lum > 128 else "\033[97m"
+    fg = "\033[30m" if lum > LUMINANCE_THRESHOLD else "\033[97m"
     return f"\033[48;2;{r};{g};{b}m{fg}"
 
 
 def _format_summary(stats: list[StageStat], total: int) -> str:
+    """Render the summary table with per-stage counts, percentages, and averages."""
     lines = [
         "",
         f"{BOLD}Summary:{RESET}  ({total} total applications)",
@@ -62,6 +85,7 @@ def _build_month_markers(
     bar_width: int,
     label_width: int,
 ) -> str:
+    """Build a row of abbreviated month labels aligned to the timeline columns."""
     month_chars = list(" " * bar_width)
     d = min_date.replace(day=1)
     while d <= max_date:
@@ -83,6 +107,7 @@ def _format_bar(
     date_to_col: Callable[[date], int],
     bar_width: int,
 ) -> str:
+    """Render a colored bar representing an application's stage timeline."""
     bar = [" "] * bar_width
 
     for seg in segments:
@@ -94,7 +119,7 @@ def _format_bar(
             c1 = bar_width - 1
         if c2 > bar_width:
             c2 = bar_width
-        color = color_map.get(seg.stage_label, "#888888")
+        color = color_map.get(seg.stage_label, FALLBACK_STAGE_COLOR)
         ansi = hex_to_ansi_bg(color)
         for c in range(c1, c2):
             bar[c] = f"{ansi} {RESET}"
@@ -113,6 +138,7 @@ def render(
     stats: list[StageStat],
     colors: dict[str, str],
 ) -> None:
+    """Print the full Gantt-style timeline to stdout."""
     label_width, bar_width = _get_dimensions()
     today = date.today()
 
@@ -145,13 +171,15 @@ def render(
     print(_build_month_markers(min_date, max_date, date_to_col, bar_width, label_width))
 
     # Application rows
+    ellipsis_width = 3  # space reserved for "..." truncation indicator
     grouped = group_by_company(apps)
     for company, roles in grouped.items():
         print(f"{BOLD}{company} ({len(roles)}){RESET}")
         for app in roles:
             bar_str = _format_bar(app.segments, colors, date_to_col, bar_width)
             total_elapsed = (app.segments[-1].end - app.segments[0].start).days
-            truncated = app.position[: label_width - 3].ljust(label_width - 2)
+            max_len = label_width - ellipsis_width
+            truncated = app.position[:max_len].ljust(label_width - 2)
             print(f"  {truncated}{bar_str}  {app.last_stage} ({total_elapsed}d)")
             if app.note:
                 print(f"  {ITALIC}{DIM}  └─ {app.note}{RESET}")

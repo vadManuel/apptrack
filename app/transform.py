@@ -1,6 +1,8 @@
+"""Pure functions for building timelines, computing stats, sorting, and grouping."""
+
 from datetime import date, datetime
 
-from app.models import Application, FlowConfig, RawRole, Segment, StageStat
+from app.models import DATE_FORMAT, Application, FlowConfig, RawRole, Segment, StageStat
 
 
 def build_timeline_data(
@@ -9,6 +11,12 @@ def build_timeline_data(
     *,
     today: date | None = None,
 ) -> list[Application]:
+    """Convert raw YAML roles into Application objects with timeline segments.
+
+    Each flow stage becomes a Segment spanning from its date to the next stage's
+    date (or today if the application is still active). Roles with no matching
+    flow stages are skipped.
+    """
     if today is None:
         today = date.today()
 
@@ -21,13 +29,13 @@ def build_timeline_data(
             stages = []
             for key in config.flow_order:
                 if key in attrs:
-                    dt = datetime.strptime(attrs[key], "%m/%d/%Y").date()
+                    dt = datetime.strptime(attrs[key], DATE_FORMAT).date()
                     stages.append((key, dt))
 
             terminal = None
             for t in config.terminal_states:
                 if t in attrs:
-                    dt = datetime.strptime(attrs[t], "%m/%d/%Y").date()
+                    dt = datetime.strptime(attrs[t], DATE_FORMAT).date()
                     terminal = (t, dt)
                     break
 
@@ -68,6 +76,7 @@ def compute_summary(
     apps: list[Application],
     config: FlowConfig,
 ) -> list[StageStat]:
+    """Compute per-stage aggregate statistics across all applications."""
     total = len(apps)
     stage_counts: dict[str, int] = {}
     stage_days: dict[str, list[int]] = {}
@@ -102,10 +111,17 @@ def sort_applications(
     apps: list[Application],
     config: FlowConfig,
 ) -> list[Application]:
+    """Sort applications: active before terminal, later stages first.
+
+    Sort key tuple:
+      - (0, ...) = active apps, (1, ...) = terminal apps
+      - Higher stage index sorts first (negated for descending)
+      - More recent end dates sort first
+    """
     flow_labels = [config.stage_map[k] for k in config.flow_order]
     terminal_labels = [config.stage_map[k] for k in config.terminal_states]
 
-    def sort_key(app: Application):
+    def sort_key(app: Application) -> tuple[int, ...]:
         is_terminal = app.last_stage in terminal_labels
         if not is_terminal:
             stage_idx = (
@@ -133,6 +149,7 @@ def sort_applications(
 def group_by_company(
     apps: list[Application],
 ) -> dict[str, list[Application]]:
+    """Group applications by company name, preserving insertion order."""
     grouped: dict[str, list[Application]] = {}
     for app in apps:
         grouped.setdefault(app.company, []).append(app)

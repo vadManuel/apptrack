@@ -1,21 +1,23 @@
+"""YAML file I/O for flow configuration and application data."""
+
 import re
-import sys
 from datetime import datetime
 from typing import NoReturn
 
 import yaml
 
-from app.models import FlowConfig, RawRole
+from app.models import DATE_FORMAT, ConfigError, FlowConfig, RawRole
 
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def _fail(file: str, message: str) -> NoReturn:
-    print(f"Error in {file}: {message}", file=sys.stderr)
-    sys.exit(1)
+    """Raise a ConfigError with the file name and message."""
+    raise ConfigError(file, message)
 
 
 def _validate_stage_entry(file: str, section: str, i: int, entry: object) -> None:
+    """Validate a single stage entry in a flow or terminal section."""
     pos = f'entry {i + 1} in "{section}"'
     if not isinstance(entry, dict):
         _fail(file, f"{pos} must be a mapping, got {type(entry).__name__}")
@@ -33,6 +35,7 @@ def _validate_stage_entry(file: str, section: str, i: int, entry: object) -> Non
 
 
 def load_flow(path: str = "flow.yaml") -> FlowConfig:
+    """Load and validate flow stage definitions from a YAML file."""
     with open(path) as f:
         data = yaml.safe_load(f)
 
@@ -71,10 +74,32 @@ def load_flow(path: str = "flow.yaml") -> FlowConfig:
     return config
 
 
+def _deduplicate_position(position: str, existing: list[RawRole]) -> str:
+    """Append a numeric suffix if a position name already exists in the list.
+
+    Examples: "Engineer" → "Engineer (1)" → "Engineer (2)"
+    """
+    increment = 0
+    for role in existing:
+        if role.position == position:
+            increment += 1
+        else:
+            pattern = rf"^{re.escape(position)} \((\d+)\)$"
+            m = re.match(pattern, role.position)
+            if m:
+                inc = int(m.group(1))
+                if inc >= increment:
+                    increment = inc + 1
+    if increment > 0:
+        position = f"{position} ({increment})"
+    return position
+
+
 def load_applications(
     valid_stage_keys: set[str],
     path: str = "applications.yaml",
 ) -> dict[str, list[RawRole]]:
+    """Load and validate application data from a YAML file."""
     with open(path) as f:
         data = yaml.safe_load(f)
 
@@ -137,7 +162,7 @@ def load_applications(
                         f'{ctx}: stage "{key}" date must be a string (M/D/YYYY)',
                     )
                 try:
-                    datetime.strptime(date_str, "%m/%d/%Y")
+                    datetime.strptime(date_str, DATE_FORMAT)
                 except ValueError:
                     _fail(
                         path,
@@ -150,20 +175,7 @@ def load_applications(
             if note is not None and not isinstance(note, str):
                 _fail(path, f'"{company}" / "{position}": "note" must be a string')
 
-            # Deduplicate position names within the same company
-            increment = 0
-            for existing in apps[company]:
-                if existing.position == position:
-                    increment += 1
-                else:
-                    pattern = rf"^{re.escape(position)} \((\d+)\)$"
-                    m = re.match(pattern, existing.position)
-                    if m:
-                        inc = int(m.group(1))
-                        if inc >= increment:
-                            increment = inc + 1
-            if increment > 0:
-                position = f"{position} ({increment})"
+            position = _deduplicate_position(position, apps[company])
 
             apps[company].append(
                 RawRole(

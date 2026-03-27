@@ -1,6 +1,7 @@
 import pytest
 
 from app.loader import load_applications, load_flow
+from app.models import ConfigError
 
 # --- load_flow ---
 
@@ -33,57 +34,39 @@ def test_load_flow_missing_file():
         load_flow("nonexistent.yaml")
 
 
-def test_load_flow_missing_section(tmp_path):
+@pytest.mark.parametrize(
+    ("yaml_content", "error_fragment"),
+    [
+        # missing terminal section
+        (
+            "flow:\n  - key: S\n    label: Sub\n    color: '#aabbcc'\n",
+            'missing required key "terminal"',
+        ),
+        # invalid hex color
+        (
+            "flow:\n  - key: S\n    label: Submitted\n    color: 'red'\nterminal: []\n",
+            'color "red" must be hex',
+        ),
+        # duplicate key
+        (
+            "flow:\n"
+            "  - key: S\n    label: Submitted\n    color: '#aabbcc'\n"
+            "  - key: S\n    label: Duplicate\n    color: '#112233'\n"
+            "terminal: []\n",
+            'duplicate stage key "S"',
+        ),
+        # missing required field
+        (
+            "flow:\n  - key: S\n    label: Submitted\nterminal: []\n",
+            'missing required field "color"',
+        ),
+    ],
+    ids=["missing-terminal", "invalid-color", "duplicate-key", "missing-field"],
+)
+def test_load_flow_invalid(tmp_path, yaml_content, error_fragment):
     flow_file = tmp_path / "flow.yaml"
-    flow_file.write_text("flow:\n  - key: S\n    label: Sub\n    color: '#aabbcc'\n")
-    with pytest.raises(SystemExit):
-        load_flow(str(flow_file))
-
-
-def test_load_flow_invalid_color(tmp_path):
-    flow_file = tmp_path / "flow.yaml"
-    flow_file.write_text(
-        """\
-flow:
-  - key: S
-    label: Submitted
-    color: "red"
-terminal: []
-"""
-    )
-    with pytest.raises(SystemExit):
-        load_flow(str(flow_file))
-
-
-def test_load_flow_duplicate_key(tmp_path):
-    flow_file = tmp_path / "flow.yaml"
-    flow_file.write_text(
-        """\
-flow:
-  - key: S
-    label: Submitted
-    color: "#aabbcc"
-  - key: S
-    label: Duplicate
-    color: "#112233"
-terminal: []
-"""
-    )
-    with pytest.raises(SystemExit):
-        load_flow(str(flow_file))
-
-
-def test_load_flow_missing_field(tmp_path):
-    flow_file = tmp_path / "flow.yaml"
-    flow_file.write_text(
-        """\
-flow:
-  - key: S
-    label: Submitted
-terminal: []
-"""
-    )
-    with pytest.raises(SystemExit):
+    flow_file.write_text(yaml_content)
+    with pytest.raises(ConfigError, match=error_fragment):
         load_flow(str(flow_file))
 
 
@@ -117,35 +100,34 @@ applications:
     assert role.note == "Great team"
 
 
-def test_load_applications_unknown_stage_key(tmp_path):
+@pytest.mark.parametrize(
+    ("yaml_content", "error_fragment"),
+    [
+        # unknown stage key
+        (
+            "applications:\n  - company: Acme\n    roles:\n"
+            "      - position: Engineer\n        stages:\n          Z: '1/10/2026'\n",
+            'unknown stage key "Z"',
+        ),
+        # invalid date format
+        (
+            "applications:\n  - company: Acme\n    roles:\n"
+            "      - position: Engineer\n        stages:\n          S: '2026-01-10'\n",
+            'invalid date "2026-01-10"',
+        ),
+        # missing company field
+        (
+            "applications:\n  - roles:\n"
+            "      - position: Engineer\n        stages:\n          S: '1/10/2026'\n",
+            'missing "company"',
+        ),
+    ],
+    ids=["unknown-key", "invalid-date", "missing-company"],
+)
+def test_load_applications_invalid(tmp_path, yaml_content, error_fragment):
     apps_file = tmp_path / "apps.yaml"
-    apps_file.write_text(
-        """\
-applications:
-  - company: Acme
-    roles:
-      - position: Engineer
-        stages:
-          Z: "1/10/2026"
-"""
-    )
-    with pytest.raises(SystemExit):
-        load_applications(VALID_KEYS, str(apps_file))
-
-
-def test_load_applications_invalid_date(tmp_path):
-    apps_file = tmp_path / "apps.yaml"
-    apps_file.write_text(
-        """\
-applications:
-  - company: Acme
-    roles:
-      - position: Engineer
-        stages:
-          S: "2026-01-10"
-"""
-    )
-    with pytest.raises(SystemExit):
+    apps_file.write_text(yaml_content)
+    with pytest.raises(ConfigError, match=error_fragment):
         load_applications(VALID_KEYS, str(apps_file))
 
 
@@ -177,18 +159,3 @@ def test_load_applications_empty_list(tmp_path):
     apps_file.write_text("applications: []\n")
     result = load_applications(VALID_KEYS, str(apps_file))
     assert result == {}
-
-
-def test_load_applications_missing_company(tmp_path):
-    apps_file = tmp_path / "apps.yaml"
-    apps_file.write_text(
-        """\
-applications:
-  - roles:
-      - position: Engineer
-        stages:
-          S: "1/10/2026"
-"""
-    )
-    with pytest.raises(SystemExit):
-        load_applications(VALID_KEYS, str(apps_file))
