@@ -15,11 +15,11 @@ flow:
   - key: W
     color: "#a88bcc"
     label: Awaiting Feedback
+
+terminal:
   - key: R
     color: "#5ebd6a"
     label: Received Offer
-
-terminal:
   - key: F
     color: "#787878"
     label: Withdrawn
