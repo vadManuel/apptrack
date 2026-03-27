@@ -5,26 +5,52 @@ A CLI tool that visualizes job application timelines in the terminal. Reads appl
 ## Prerequisites
 
 - Python 3.13+
-- [Poetry](https://python-poetry.org/)
+- [uv](https://docs.astral.sh/uv/)
 
 ## Install
 
 ```sh
-poetry install
+uv sync
 ```
 
 ## Run
 
 ```sh
-poetry run python main.py
+uv run apptrack
 ```
 
-## Lint & Format
+### CLI Options
+
+| Flag     | Default              | Description                      |
+| -------- | -------------------- | -------------------------------- |
+| `--flow` | `flow.yaml`          | Path to flow config YAML         |
+| `--apps` | `applications.yaml`  | Path to applications YAML        |
 
 ```sh
-poetry run ruff format .      # format code
-poetry run ruff check .       # lint
-poetry run ruff check --fix . # auto-fix lint issues
+uv run apptrack --flow custom-flow.yaml --apps my-apps.yaml
+```
+
+Set `NO_COLOR=1` to disable ANSI color output:
+
+```sh
+NO_COLOR=1 uv run apptrack
+```
+
+## Development
+
+### Lint, Format & Type Check
+
+```sh
+uv run ruff format app/ main.py tests/  # format code
+uv run ruff check app/ main.py tests/   # lint
+uv run ruff check --fix app/ main.py    # auto-fix lint issues
+uv run pyright app/ main.py             # type check
+```
+
+### Test
+
+```sh
+uv run pytest
 ```
 
 ## Data
@@ -33,26 +59,7 @@ Stage definitions are stored in `flow.yaml` (committed). Application data is sto
 
 ### Setting up `applications.yaml`
 
-Create an `applications.yaml` file in the project root:
-
-```yaml
-applications:
-  - company: Acme
-    roles:
-      - position: Senior Software Engineer
-        note: Optional note # optional
-        stages:
-          S: 3/1/2026
-          C: 3/5/2026
-```
-
-Each entry under `applications` has:
-
-- **`company`** — the company name
-- **`roles`** — a list of positions applied to at that company
-  - **`position`** — the role title
-  - **`note`** *(optional)* — any extra context
-  - **`stages`** — a map of stage keys to dates (`M/D/YYYY`)
+Create an `applications.yaml` file in the project root. See [`applications.example.yaml`](applications.example.yaml) for the expected format. JSON schemas for both files are in the `schemas/` directory for IDE autocompletion.
 
 Stage keys are defined in `flow.yaml`:
 

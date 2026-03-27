@@ -1,26 +1,45 @@
 [project]
 name = "applications"
 version = "0.1.0"
-description = ""
+description = "CLI tool that visualizes job application timelines in the terminal"
 authors = [
     {name = "Manuel Vasquez Dickson",email = "vadmanuel@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["pyyaml>=6.0"]
+license = "MIT"
+keywords = ["cli", "job-applications", "gantt", "terminal"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Utilities",
+]
+dependencies = ["pyyaml>=6.0,<7.0"]
 
-[tool.poetry]
-package-mode = false 
-
+[project.scripts]
+apptrack = "main:main"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [dependency-groups]
 dev = [
-    "ruff (>=0.15.8,<0.16.0)"
+    "ruff>=0.15.8,<0.16.0",
+    "pyright>=1.1.408,<2.0.0",
+    "pytest>=8.0,<9.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
 
 [tool.ruff]
 target-version = "py313"
@@ -36,4 +55,7 @@ select = [
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
     "SIM", # flake8-simplify
+    "A",   # flake8-builtins
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff-specific rules
 ]
