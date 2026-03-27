@@ -1,0 +1,30 @@
+flow:
+  - key: S
+    color: "#8294a8"
+    label: Submitted
+  - key: C
+    color: "#6aaddb"
+    label: Recruiter Scheduled
+  - key: A
+    color: "#d9b44a"
+    label: Assessment
+  - key: L
+    color: "#d48a3c"
+    label: Interview Loop
+  - key: W
+    color: "#a88bcc"
+    label: Awaiting Feedback
+  - key: R
+    color: "#5ebd6a"
+    label: Received Offer
+
+terminal:
+  - key: F
+    color: "#787878"
+    label: Withdrawn
+  - key: X
+    color: "#d46a6a"
+    label: Denied
+  - key: U
+    color: "#c49660"
+    label: Filtered Out
