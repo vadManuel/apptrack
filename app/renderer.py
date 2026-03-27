@@ -7,13 +7,10 @@ from datetime import date
 from app.models import Application, Segment, StageStat
 from app.transform import group_by_company
 
-# Respect the NO_COLOR convention (https://no-color.org/)
-NO_COLOR = "NO_COLOR" in os.environ
-
-RESET = "" if NO_COLOR else "\033[0m"
-BOLD = "" if NO_COLOR else "\033[1m"
-DIM = "" if NO_COLOR else "\033[2m"
-ITALIC = "" if NO_COLOR else "\033[3m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+ITALIC = "\033[3m"
 
 # Layout constants
 SUFFIX_WIDTH = 30  # space reserved for "  Stage (Xd)" suffix column
@@ -43,10 +40,7 @@ def hex_to_ansi_bg(hex_color: str) -> str:
 
     Automatically picks a black or white foreground based on the
     perceived luminance of the background (ITU-R BT.601 formula).
-    Returns an empty string when NO_COLOR is set.
     """
-    if NO_COLOR:
-        return ""
     r = int(hex_color[1:3], 16)
     g = int(hex_color[3:5], 16)
     b = int(hex_color[5:7], 16)
