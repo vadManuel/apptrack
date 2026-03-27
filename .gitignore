@@ -1,11 +1,40 @@
+# OS
 .DS_Store
-__pycache__
+
+# Python
+__pycache__/
 *.pyc
-.python-version
+*.pyd
+*.so
+*.egg-info/
+
+# Virtual environments
 .venv/
-.ruff_cache
-.mypy_cache
+venv/
+
+# Build
 dist/
 build/
-*.egg-info/
+
+# Tools
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.pyright/
+
+# Coverage
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+
+# Project-specific
 applications.yaml
