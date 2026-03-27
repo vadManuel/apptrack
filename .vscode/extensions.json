@@ -1,0 +1,7 @@
+{
+    "recommendations": [
+        "bungcip.better-toml",
+        "charliermarsh.ruff",
+        "ms-python.python"
+    ]
+}

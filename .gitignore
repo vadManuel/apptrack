@@ -27,7 +27,6 @@ build/
 htmlcov/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
