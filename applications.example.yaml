@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=schemas/applications.schema.json
 # List of job applications to track.
 # Each entry is a company with one or more roles.
 applications:

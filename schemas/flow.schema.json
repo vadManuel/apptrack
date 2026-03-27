@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Flow Configuration",
+  "description": "Defines the pipeline stages and terminal states for the applications tracker.",
+  "type": "object",
+  "properties": {
+    "flow": {
+      "description": "Ordered list of progressive pipeline stages.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage" },
+      "minItems": 1
+    },
+    "terminal": {
+      "description": "List of terminal (end) states.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage" },
+      "minItems": 1
+    }
+  },
+  "required": ["flow", "terminal"],
+  "additionalProperties": false,
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "Single-character key used in applications.yaml.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "color": {
+          "description": "Hex color for terminal rendering (e.g. '#a1b2c3').",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "label": {
+          "description": "Human-readable stage name.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["key", "color", "label"],
+      "additionalProperties": false
+    }
+  }
+}

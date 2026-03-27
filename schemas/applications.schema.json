@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Applications Data",
+  "description": "Job application entries with company, roles, and stage dates.",
+  "type": "object",
+  "properties": {
+    "applications": {
+      "description": "List of companies with their role applications.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/company" }
+    }
+  },
+  "required": ["applications"],
+  "additionalProperties": false,
+  "$defs": {
+    "company": {
+      "type": "object",
+      "properties": {
+        "company": {
+          "description": "Company name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "roles": {
+          "description": "List of roles applied to at this company.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/role" },
+          "minItems": 1
+        }
+      },
+      "required": ["company", "roles"],
+      "additionalProperties": false
+    },
+    "role": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "description": "Job title or position name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "stages": { "$ref": "#/$defs/stages" },
+        "note": {
+          "description": "Optional note about this application.",
+          "type": "string"
+        }
+      },
+      "required": ["position", "stages"],
+      "additionalProperties": false
+    },
+    "stages": {
+      "description": "Mapping of stage key to date string (M/D/YYYY).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(0?[1-9]|1[0-2])/(0?[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+      }
+    }
+  }
+}
