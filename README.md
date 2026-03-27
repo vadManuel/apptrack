@@ -7,16 +7,17 @@ A CLI tool that visualizes job application timelines in the terminal. Reads appl
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
 
-## Install
+## Setup
 
 ```sh
+make setup
 uv sync
 ```
 
 ## Run
 
 ```sh
-uv run apptrack
+uv run apptrack --apps applications.example.yaml
 ```
 
 ### CLI Options
@@ -24,7 +25,7 @@ uv run apptrack
 | Flag     | Default              | Description                      |
 | -------- | -------------------- | -------------------------------- |
 | `--flow` | `flow.yaml`          | Path to flow config YAML         |
-| `--apps` | `applications.yaml`  | Path to applications YAML        |
+| `--apps` | -                    | Path to applications YAML        |
 
 ```sh
 uv run apptrack --flow custom-flow.yaml --apps my-apps.yaml

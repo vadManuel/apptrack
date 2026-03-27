@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Capture staged .py files before formatting
+STAGED_PY=$(git diff --cached --name-only -- '*.py')
+
+# Auto-format all project files
+uv run ruff format app/ main.py tests/
+
+# Re-stage any formatted files that were already staged
+if [ -n "$STAGED_PY" ]; then
+    echo "$STAGED_PY" | xargs git add
+fi
+
+# Lint all project files
+uv run ruff check app/ main.py tests/
+
+# Type check all project files
+uv run pyright app/ main.py
